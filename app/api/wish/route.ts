@@ -1,49 +1,49 @@
+
 import { Resend } from "resend";
 
 export async function POST(request: Request) {
   try {
-    // Get the API key only when the request is actually made.
-    // This prevents Next.js from trying to initialize Resend
-    // during the production build.
+    console.log("=== WISH API STARTED ===");
+
     const apiKey = process.env.RESEND_API_KEY;
-
-    if (!apiKey) {
-      console.error("RESEND_API_KEY is not configured.");
-
-      return Response.json(
-        {
-          success: false,
-          error: "Email service is not configured.",
-        },
-        { status: 500 }
-      );
-    }
-
     const receiverEmail = process.env.WISH_RECEIVER_EMAIL;
 
-    if (!receiverEmail) {
-      console.error("WISH_RECEIVER_EMAIL is not configured.");
+    console.log("API key exists:", !!apiKey);
+    console.log("Receiver email exists:", !!receiverEmail);
+
+    if (!apiKey) {
+      console.error("RESEND_API_KEY is missing");
 
       return Response.json(
         {
           success: false,
-          error: "Receiver email is not configured.",
+          error: "RESEND_API_KEY is missing on the server.",
         },
         { status: 500 }
       );
     }
 
-    const resend = new Resend(apiKey);
+    if (!receiverEmail) {
+      console.error("WISH_RECEIVER_EMAIL is missing");
 
-    // Get submitted data
+      return Response.json(
+        {
+          success: false,
+          error: "WISH_RECEIVER_EMAIL is missing on the server.",
+        },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
+
+    console.log("Request body received:", body);
 
     const wish =
       typeof body.wish === "string"
         ? body.wish.trim()
         : "";
 
-    // Validate wish
     if (!wish) {
       return Response.json(
         {
@@ -54,7 +54,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Optional protection against extremely large requests
     if (wish.length > 2000) {
       return Response.json(
         {
@@ -65,7 +64,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Send the wish
+    const resend = new Resend(apiKey);
+
+    console.log("Sending email...");
+
     const { data, error } = await resend.emails.send({
       from: "Winnie's Birthday <onboarding@resend.dev>",
       to: receiverEmail,
@@ -84,18 +86,18 @@ Sent from Winnie's Birthday Website 🎂
     });
 
     if (error) {
-  console.error("Resend error:", error);
+      console.error("RESEND ERROR:", error);
 
-  return Response.json(
-    {
-      success: false,
-      error: error.message || "Failed to send the wish.",
-    },
-    { status: 500 }
-  );
-}
+      return Response.json(
+        {
+          success: false,
+          error: error.message || "Resend failed to send the email.",
+        },
+        { status: 500 }
+      );
+    }
 
-    console.log("Wish sent successfully:", data?.id);
+    console.log("EMAIL SENT:", data);
 
     return Response.json({
       success: true,
@@ -103,12 +105,18 @@ Sent from Winnie's Birthday Website 🎂
       id: data?.id,
     });
   } catch (error) {
-    console.error("Wish API error:", error);
+    console.error("=== WISH API ERROR ===");
+    console.error(error);
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
 
     return Response.json(
       {
         success: false,
-        error: "Something went wrong while sending the wish.",
+        error: message,
       },
       { status: 500 }
     );
