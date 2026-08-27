@@ -1,158 +1,117 @@
-import { NextResponse } from "next/server";
 import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
+    // Get the API key only when the request is actually made.
+    // This prevents Next.js from trying to initialize Resend
+    // during the production build.
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      console.error("RESEND_API_KEY is not configured.");
+
+      return Response.json(
+        {
+          success: false,
+          error: "Email service is not configured.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const receiverEmail = process.env.WISH_RECEIVER_EMAIL;
+
+    if (!receiverEmail) {
+      console.error("WISH_RECEIVER_EMAIL is not configured.");
+
+      return Response.json(
+        {
+          success: false,
+          error: "Receiver email is not configured.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const resend = new Resend(apiKey);
+
+    // Get submitted data
     const body = await request.json();
 
-    const wish = body.wish?.trim();
+    const wish =
+      typeof body.wish === "string"
+        ? body.wish.trim()
+        : "";
 
+    // Validate wish
     if (!wish) {
-      return NextResponse.json(
+      return Response.json(
         {
-          error: "Wish is required",
+          success: false,
+          error: "Please write a wish first.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    if (wish.length > 300) {
-      return NextResponse.json(
+    // Optional protection against extremely large requests
+    if (wish.length > 2000) {
+      return Response.json(
         {
-          error: "Wish is too long",
+          success: false,
+          error: "Your wish is too long.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    const receiver = process.env.WISH_RECEIVER_EMAIL;
-
-    if (!receiver) {
-      return NextResponse.json(
-        {
-          error: "Receiver email is not configured",
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    const { error } = await resend.emails.send({
+    // Send the wish
+    const { data, error } = await resend.emails.send({
       from: "Winnie's Birthday <onboarding@resend.dev>",
-      to: receiver,
-      subject: "💌 Winnie made a birthday wish",
-      html: `
-        <div
-          style="
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: auto;
-            padding: 40px 25px;
-            background: #09090f;
-            color: #ffffff;
-            border-radius: 20px;
-          "
-        >
+      to: receiverEmail,
+      subject: "🎂 Winnie made a birthday wish ❤️",
+      text: `
+Winnie made a birthday wish! ❤️
 
-          <h1
-            style="
-              color: #f9a8d4;
-              margin-bottom: 10px;
-            "
-          >
-            💌 Winnie made a wish
-          </h1>
+--------------------------------
 
-          <p
-            style="
-              color: #a1a1aa;
-              font-size: 15px;
-            "
-          >
-            Someone special just made a birthday wish. ✨
-          </p>
+${wish}
 
-          <div
-            style="
-              margin-top: 30px;
-              padding: 25px;
-              background: #18181f;
-              border-radius: 16px;
-              border: 1px solid #27272a;
-            "
-          >
+--------------------------------
 
-            <p
-              style="
-                color: #71717a;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-              "
-            >
-              Winnie's wish
-            </p>
-
-            <p
-              style="
-                color: #f4f4f5;
-                font-size: 16px;
-                line-height: 1.8;
-                font-style: italic;
-              "
-            >
-              "${wish}"
-            </p>
-
-          </div>
-
-          <p
-            style="
-              margin-top: 30px;
-              color: #71717a;
-              font-size: 12px;
-            "
-          >
-            Sent from Winnie's birthday website ❤️
-          </p>
-
-        </div>
-      `,
+Sent from Winnie's Birthday Website 🎂
+      `.trim(),
     });
 
     if (error) {
       console.error("Resend error:", error);
 
-      return NextResponse.json(
+      return Response.json(
         {
-          error: "Failed to send wish",
+          success: false,
+          error: "Failed to send the wish.",
         },
-        {
-          status: 500,
-        }
+        { status: 500 }
       );
     }
 
-    return NextResponse.json({
+    console.log("Wish sent successfully:", data?.id);
+
+    return Response.json({
       success: true,
+      message: "Wish sent successfully ❤️",
+      id: data?.id,
     });
   } catch (error) {
     console.error("Wish API error:", error);
 
-    return NextResponse.json(
+    return Response.json(
       {
-        error: "Something went wrong",
+        success: false,
+        error: "Something went wrong while sending the wish.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
+
