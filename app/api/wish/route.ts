@@ -84,16 +84,16 @@ Sent from Winnie's Birthday Website 🎂
     });
 
     if (error) {
-      console.error("Resend error:", error);
+  console.error("Resend error:", error);
 
-      return Response.json(
-        {
-          success: false,
-          error: "Failed to send the wish.",
-        },
-        { status: 500 }
-      );
-    }
+  return Response.json(
+    {
+      success: false,
+      error: error.message || "Failed to send the wish.",
+    },
+    { status: 500 }
+  );
+}
 
     console.log("Wish sent successfully:", data?.id);
 
